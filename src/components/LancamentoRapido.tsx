@@ -189,6 +189,14 @@ export function LancamentoRapido({
             </p>
           )}
 
+          {/* parcelar so faz sentido em cartao: avisa em vez de descartar calado */}
+          {parcelas && !ehCartao && (
+            <p className="mb-2 text-xs font-medium text-negativo">
+              Parcelamento só vale em cartão. Escolha um cartão no chip abaixo — em{' '}
+              {conta?.nome ?? 'conta de débito'} isso entraria como {brl(valor ?? 0)} de uma vez.
+            </p>
+          )}
+
           {/* controles: tudo ajustavel em 1 toque, sem sair do fluxo */}
           <div className="flex flex-wrap items-center gap-2">
             <ChipSelect

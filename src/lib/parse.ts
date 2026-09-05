@@ -167,6 +167,7 @@ export function parseLancamento(texto: string, ctx: Ctx): Parsed {
     .filter((c) => !c.arquivada)
     .map((c) => ({ id: c.id, nome: c.nome, chave: norm(c.nome) }))
     .sort((a, b) => b.chave.length - a.chave.length)
+  let iConta = -1
   for (let i = 0; i < tokens.length && !conta_id; i++) {
     if (consumido.has(i)) continue
     const t = n(i)
@@ -179,10 +180,35 @@ export function parseLancamento(texto: string, ctx: Ctx): Parsed {
         (t.length >= 3 && (a.chave.startsWith(t) || primeira.startsWith(t)))
       if (!bate) continue
       conta_id = a.id
+      iConta = i
       marca(i)
       if (PREPOSICOES_CONTA.includes(n(i - 1))) marca(i - 1)
       entendeu.push({ campo: 'conta', texto: a.nome })
       break
+    }
+  }
+
+  /**
+   * O nome da conta nunca pode comer a unica palavra da descricao.
+   * Com uma conta chamada "Mercado Pago", "mercado 180" viraria um lancamento
+   * sem descricao nenhuma — e "mercado" e justamente o que voce quis dizer.
+   * Se veio precedido de preposicao ("no mercado 180"), ai foi intencional.
+   */
+  if (conta_id && iConta >= 0 && !PREPOSICOES_CONTA.includes(n(iConta - 1))) {
+    // o valor ainda nao foi extraido nesta altura, entao numeros nao contam
+    // como descricao — senao "mercado 180" pareceria ter texto sobrando
+    const sobraAlgo = tokens.some(
+      (t, i) =>
+        i !== iConta &&
+        !consumido.has(i) &&
+        !STOPWORDS.has(norm(t)) &&
+        !/^r?\$?\d[\d.,]*$/.test(norm(t)),
+    )
+    if (!sobraAlgo) {
+      conta_id = null
+      consumido.delete(iConta)
+      const idx = entendeu.findIndex((e) => e.campo === 'conta')
+      if (idx >= 0) entendeu.splice(idx, 1)
     }
   }
 
@@ -235,6 +261,21 @@ export function adivinharCategoria(
   }
 
   let melhor: { id: string; peso: number } | null = null
+
+  /**
+   * 2) o proprio nome da categoria. Suas categorias podem se chamar
+   * "IFood/restaurante" ou "Uber/transporte" — o dicionario abaixo so casa por
+   * nome exato, entao sem isto "ifood 45" ficaria sem categoria pra sempre.
+   */
+  for (const cat of validas) {
+    for (const palavra of norm(cat.nome).split(/[^a-z0-9]+/)) {
+      if (palavra.length >= 4 && d.includes(palavra) && (!melhor || palavra.length > melhor.peso)) {
+        melhor = { id: cat.id, peso: palavra.length }
+      }
+    }
+  }
+
+  // 3) dicionario padrao, casando pelo nome exato da categoria
   for (const nomeCat of Object.keys(DICIONARIO)) {
     const cat = validas.find((c) => norm(c.nome) === norm(nomeCat))
     if (!cat) continue
