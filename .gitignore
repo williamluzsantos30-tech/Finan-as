@@ -1,0 +1,19 @@
+# dependências e build
+node_modules
+dist
+*.tsbuildinfo
+
+# configuração local / segredos
+.env
+.env.local
+.env.*.local
+
+# planilhas e backups: dados financeiros nunca vão pro repositório
+*.xlsx
+*.xls
+*.csv
+financas-*.json
+
+# sistema
+.DS_Store
+Thumbs.db
